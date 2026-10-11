@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bigtheta-db-posstgresql}
+      POSTGRES_USER: ${POSTGRES_USER:-lemon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lemon}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lemon} -d ${POSTGRES_DB:-bigtheta-db-posstgresql}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrantdata:/qdrant/storage
+
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    environment:
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-bigtheta-db-posstgresql}
+      POSTGRES_USER: ${POSTGRES_USER:-lemon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lemon}
+      QDRANT_URL: http://qdrant:6333
+      VECTOR_STORE_TYPE: qdrant
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1536}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      UPLOAD_DIR: /data/uploads
+    ports:
+      - "8080:8080"
+    volumes:
+      - uploads:/data/uploads
+
+volumes:
+  pgdata:
+  qdrantdata:
+  uploads:
